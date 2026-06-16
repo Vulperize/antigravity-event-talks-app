@@ -81,12 +81,17 @@ def get_releases():
                         app.logger.error("Failed to fetch feed: HTTP %d", response.status_code)
                         if not releases_cache["data"]:
                             return jsonify({"error": "Failed to fetch remote feed"}), 500
+                        else:
+                            # Cooldown of 5 minutes:
+                            releases_cache["last_updated"] = now - CACHE_TIMEOUT_SECONDS + 300
                 except Exception as e:
                     if not releases_cache["data"]:
                         app.logger.error("Failed to fetch/parse feed: %s", e)
                         return jsonify({"error": "An unexpected error occurred while fetching release notes"}), 500
                     else:
                         app.logger.warning("Failed to fetch/parse feed, serving stale cached data: %s", e)
+                        # Cooldown of 5 minutes:
+                        releases_cache["last_updated"] = now - CACHE_TIMEOUT_SECONDS + 300
                 
     return jsonify(releases_cache["data"])
 

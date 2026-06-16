@@ -77,6 +77,70 @@ class TestCache(unittest.TestCase):
             mock_warning.assert_called_once()
             # Stale cached data is returned
             self.assertEqual(response_fail.json[0]['title'], "Initial Title")
+            
+            # Assert cooldown is set
+            import time
+            now = time.time()
+            expected_cooldown = now - app.CACHE_TIMEOUT_SECONDS + 300
+            self.assertAlmostEqual(app.releases_cache["last_updated"], expected_cooldown, delta=2)
+            
+            # Subsequent non-forced request should return stale cached data without calling remote
+            mock_get.reset_mock()
+            mock_get.side_effect = None
+            mock_get.return_value = mock_response
+            
+            response_subsequent = self.client.get('/api/releases')
+            self.assertEqual(response_subsequent.status_code, 200)
+            self.assertEqual(response_subsequent.json[0]['title'], "Initial Title")
+            mock_get.assert_not_called()
+
+    @patch('app.requests.get')
+    def test_cache_http_failure_with_stale_data(self, mock_get):
+        # Populate cache first
+        mock_response_ok = unittest.mock.Mock()
+        mock_response_ok.status_code = 200
+        mock_response_ok.content = b"""<?xml version="1.0" encoding="utf-8"?>
+        <feed xmlns="http://www.w3.org/2005/Atom">
+            <entry>
+                <title>Initial Title</title>
+                <updated>2026-06-16T12:00:00Z</updated>
+                <content type="html">Initial Content</content>
+            </entry>
+        </feed>"""
+        mock_get.return_value = mock_response_ok
+
+        # Request to populate cache
+        response = self.client.get('/api/releases')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(mock_get.call_count, 1)
+
+        # Now mock a non-200 HTTP response
+        mock_response_fail = unittest.mock.Mock()
+        mock_response_fail.status_code = 503
+        mock_get.return_value = mock_response_fail
+
+        with patch.object(app.app.logger, 'error') as mock_error:
+            response_fail = self.client.get('/api/releases?refresh=true')
+            self.assertEqual(response_fail.status_code, 200)
+            # Should have logged error
+            mock_error.assert_called_once()
+            # Stale cached data is returned
+            self.assertEqual(response_fail.json[0]['title'], "Initial Title")
+            
+            # Assert cooldown is set
+            import time
+            now = time.time()
+            expected_cooldown = now - app.CACHE_TIMEOUT_SECONDS + 300
+            self.assertAlmostEqual(app.releases_cache["last_updated"], expected_cooldown, delta=2)
+            
+            # Subsequent non-forced request should return stale cached data without calling remote
+            mock_get.reset_mock()
+            mock_get.return_value = mock_response_ok
+            
+            response_subsequent = self.client.get('/api/releases')
+            self.assertEqual(response_subsequent.status_code, 200)
+            self.assertEqual(response_subsequent.json[0]['title'], "Initial Title")
+            mock_get.assert_not_called()
 
     @patch('app.requests.get')
     def test_cache_failure_no_stale_data(self, mock_get):
