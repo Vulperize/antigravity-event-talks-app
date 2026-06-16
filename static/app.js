@@ -21,6 +21,12 @@ async function fetchReleases(force = false) {
         if (!response.ok) throw new Error('Failed to load releases');
         
         releases = await response.json();
+        
+        // Pre-compute Stripped HTML
+        releases.forEach(item => {
+            item.strippedContent = stripHtml(item.content);
+        });
+        
         renderList();
         
         // Auto-select first item if none is selected
@@ -28,7 +34,7 @@ async function fetchReleases(force = false) {
             selectRelease(releases[0].id);
         }
     } catch (error) {
-        feedList.innerHTML = `<div class="error-state">Error: ${error.message}</div>`;
+        feedList.innerHTML = `<div class="error-state">Error: ${escapeHtml(error.message)}</div>`;
     } finally {
         setLoadingState(false);
     }
@@ -50,7 +56,7 @@ function renderList() {
     const filtered = releases.filter(item => {
         const matchesCategory = activeFilter === 'ALL' || item.type === activeFilter;
         
-        const cleanContent = stripHtml(item.content).toLowerCase();
+        const cleanContent = item.strippedContent.toLowerCase();
         const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
                               cleanContent.includes(searchQuery.toLowerCase());
                               
@@ -64,7 +70,7 @@ function renderList() {
 
     feedList.innerHTML = filtered.map(item => {
         const isSelected = item.id === selectedReleaseId;
-        const snippet = stripHtml(item.content);
+        const snippet = item.strippedContent;
         
         return `
             <div class="release-card ${isSelected ? 'active' : ''}" data-id="${escapeHtml(item.id)}">
@@ -99,9 +105,58 @@ function stripHtml(html) {
     return doc.body.textContent || "";
 }
 
-// Stub function for selectRelease
 function selectRelease(id) {
-    console.log("Selecting: " + id);
+    selectedReleaseId = id;
+    
+    // Highlight active card
+    document.querySelectorAll('.release-card').forEach(card => {
+        card.classList.remove('active');
+    });
+    
+    const selectedCard = document.querySelector(`.release-card[data-id="${escapeHtml(id)}"]`);
+    if (selectedCard) {
+        selectedCard.classList.add('active');
+    }
+    
+    // Find item
+    const item = releases.find(r => r.id === id);
+    if (!item) return;
+    
+    // Render details
+    // Note: item.content contains parsed HTML, so we render it as-is in detail-content (no escapeHtml on item.content itself, but do escape the title and date).
+    detailPane.innerHTML = `
+        <div class="detail-header">
+            <div>
+                <div class="detail-meta">
+                    <span class="badge ${escapeHtml(item.type)}">${escapeHtml(item.type)}</span>
+                    <span class="card-date">Published on ${escapeHtml(item.date)}</span>
+                </div>
+                <h2 class="detail-title">${escapeHtml(item.title)}</h2>
+            </div>
+            <button class="tweet-btn" onclick="shareTweet('${escapeHtml(item.id)}')">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                <span>Tweet</span>
+            </button>
+        </div>
+        <div class="detail-content">
+            ${item.content}
+        </div>
+    `;
+}
+
+function shareTweet(id) {
+    const item = releases.find(r => r.id === id);
+    if (!item) return;
+    
+    // Build tweet text
+    const textSnippet = item.strippedContent.substring(0, 150) + "...";
+    const tweetText = `BigQuery Update: ${item.title}\n\n"${textSnippet}"\n\n#GoogleCloud #BigQuery`;
+    
+    // Generate Twitter Web Intent URL
+    const twitterIntentUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
+    
+    // Open in a new tab
+    window.open(twitterIntentUrl, '_blank', 'width=550,height=420');
 }
 
 // Event Bindings
