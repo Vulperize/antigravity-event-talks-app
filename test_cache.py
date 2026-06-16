@@ -11,6 +11,7 @@ class TestCache(unittest.TestCase):
         # Reset cache
         app.releases_cache["data"] = None
         app.releases_cache["last_updated"] = 0
+        app.releases_cache["last_failed"] = 0
 
     @patch('app.requests.get')
     def test_caching_behavior(self, mock_get):
@@ -81,8 +82,7 @@ class TestCache(unittest.TestCase):
             # Assert cooldown is set
             import time
             now = time.time()
-            expected_cooldown = now - app.CACHE_TIMEOUT_SECONDS + 300
-            self.assertAlmostEqual(app.releases_cache["last_updated"], expected_cooldown, delta=2)
+            self.assertAlmostEqual(app.releases_cache["last_failed"], now, delta=2)
             
             # Subsequent non-forced request should return stale cached data without calling remote
             mock_get.reset_mock()
@@ -130,8 +130,7 @@ class TestCache(unittest.TestCase):
             # Assert cooldown is set
             import time
             now = time.time()
-            expected_cooldown = now - app.CACHE_TIMEOUT_SECONDS + 300
-            self.assertAlmostEqual(app.releases_cache["last_updated"], expected_cooldown, delta=2)
+            self.assertAlmostEqual(app.releases_cache["last_failed"], now, delta=2)
             
             # Subsequent non-forced request should return stale cached data without calling remote
             mock_get.reset_mock()
@@ -151,6 +150,49 @@ class TestCache(unittest.TestCase):
             response_fail = self.client.get('/api/releases')
             self.assertEqual(response_fail.status_code, 500)
             mock_error.assert_called_once()
+
+    @patch('app.requests.get')
+    def test_cooldown_on_empty_cache(self, mock_get):
+        # Empty cache, first attempt fails
+        mock_get.side_effect = Exception("Connection Refused")
+        
+        with patch.object(app.app.logger, 'error') as mock_error:
+            response = self.client.get('/api/releases')
+            self.assertEqual(response.status_code, 500)
+            self.assertEqual(mock_get.call_count, 1)
+            mock_error.assert_called_once()
+        
+        # Second attempt should NOT call requests.get because we are in cooldown
+        mock_get.reset_mock()
+        response2 = self.client.get('/api/releases')
+        self.assertEqual(response2.status_code, 500)
+        mock_get.assert_not_called()
+        
+        # Forced refresh should bypass cooldown and try again
+        mock_get.reset_mock()
+        mock_get.side_effect = Exception("Another Connection Refused")
+        with patch.object(app.app.logger, 'error') as mock_error:
+            response3 = self.client.get('/api/releases?refresh=true')
+            self.assertEqual(response3.status_code, 500)
+            self.assertEqual(mock_get.call_count, 1)
+
+    @patch('app.requests.get')
+    def test_non_blocking_lock_returns_stale_data(self, mock_get):
+        # Populate cache with stale data
+        import time
+        app.releases_cache["data"] = [{"id": "stale", "title": "Stale", "date": "2026-06-16", "type": "CHANGE", "content": "Stale content"}]
+        app.releases_cache["last_updated"] = time.time() - app.CACHE_TIMEOUT_SECONDS - 100
+        
+        # Acquire lock in test thread to simulate another thread updating the cache
+        app.cache_lock.acquire()
+        try:
+            # Request should immediately return stale data without blocking or calling requests.get
+            response = self.client.get('/api/releases')
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json[0]['title'], "Stale")
+            mock_get.assert_not_called()
+        finally:
+            app.cache_lock.release()
 
 if __name__ == '__main__':
     unittest.main()

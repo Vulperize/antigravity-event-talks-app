@@ -12,9 +12,11 @@ FEED_URL = "https://docs.cloud.google.com/feeds/bigquery-release-notes.xml"
 # In-memory cache store
 releases_cache = {
     "data": None,
-    "last_updated": 0
+    "last_updated": 0,
+    "last_failed": 0
 }
 CACHE_TIMEOUT_SECONDS = 3600  # 1 hour
+FAILURE_COOLDOWN_SECONDS = 300  # 5 minutes
 cache_lock = threading.Lock()
 
 def parse_xml_feed(xml_content):
@@ -66,33 +68,61 @@ def get_releases():
     force_refresh = request.args.get('refresh', 'false').lower() == 'true'
     now = time.time()
     
-    if force_refresh or not releases_cache["data"] or (now - releases_cache["last_updated"] > CACHE_TIMEOUT_SECONDS):
-        with cache_lock:
-            # Recheck inside lock (double-checked locking)
-            now = time.time()
-            if force_refresh or not releases_cache["data"] or (now - releases_cache["last_updated"] > CACHE_TIMEOUT_SECONDS):
-                try:
-                    response = requests.get(FEED_URL, timeout=10)
-                    if response.status_code == 200:
-                        parsed_data = parse_xml_feed(response.content)
-                        releases_cache["data"] = parsed_data
-                        releases_cache["last_updated"] = now
-                    else:
-                        app.logger.error("Failed to fetch feed: HTTP %d", response.status_code)
-                        if not releases_cache["data"]:
-                            return jsonify({"error": "Failed to fetch remote feed"}), 500
+    # Check if cache needs refresh
+    needs_refresh = (
+        force_refresh or 
+        not releases_cache["data"] or 
+        (now - releases_cache["last_updated"] > CACHE_TIMEOUT_SECONDS)
+    )
+    
+    # If it needs refresh, respect the failure cooldown unless it's a forced refresh
+    if needs_refresh and not force_refresh:
+        if now - releases_cache["last_failed"] < FAILURE_COOLDOWN_SECONDS:
+            needs_refresh = False
+
+    if needs_refresh:
+        # If we have stale data and this is not a forced refresh, acquire lock non-blockingly.
+        # This allows concurrent requests to serve stale data immediately without waiting.
+        can_block = not releases_cache["data"] or force_refresh
+        acquired = cache_lock.acquire(blocking=can_block)
+        
+        if acquired:
+            try:
+                # Recheck inside lock (double-checked locking)
+                now = time.time()
+                needs_refresh_inner = (
+                    force_refresh or 
+                    not releases_cache["data"] or 
+                    (now - releases_cache["last_updated"] > CACHE_TIMEOUT_SECONDS)
+                )
+                if needs_refresh_inner and (force_refresh or now - releases_cache["last_failed"] >= FAILURE_COOLDOWN_SECONDS):
+                    try:
+                        response = requests.get(FEED_URL, timeout=10)
+                        if response.status_code == 200:
+                            releases_cache["data"] = parse_xml_feed(response.content)
+                            releases_cache["last_updated"] = now
+                            releases_cache["last_failed"] = 0
                         else:
-                            # Cooldown of 5 minutes:
-                            releases_cache["last_updated"] = now - CACHE_TIMEOUT_SECONDS + 300
-                except Exception as e:
-                    if not releases_cache["data"]:
-                        app.logger.error("Failed to fetch/parse feed: %s", e)
-                        return jsonify({"error": "An unexpected error occurred while fetching release notes"}), 500
-                    else:
-                        app.logger.warning("Failed to fetch/parse feed, serving stale cached data: %s", e)
-                        # Cooldown of 5 minutes:
-                        releases_cache["last_updated"] = now - CACHE_TIMEOUT_SECONDS + 300
-                
+                            app.logger.error("Failed to fetch feed: HTTP %d", response.status_code)
+                            releases_cache["last_failed"] = now
+                            if not releases_cache["data"]:
+                                return jsonify({"error": "Failed to fetch remote feed"}), 500
+                    except Exception as e:
+                        releases_cache["last_failed"] = now
+                        if not releases_cache["data"]:
+                            app.logger.error("Failed to fetch/parse feed: %s", e)
+                            return jsonify({"error": "An unexpected error occurred while fetching release notes"}), 500
+                        else:
+                            app.logger.warning("Failed to fetch/parse feed, serving stale cached data: %s", e)
+            finally:
+                cache_lock.release()
+        else:
+            # Could not acquire lock, serve stale data immediately
+            pass
+
+    if not releases_cache["data"]:
+        return jsonify({"error": "Failed to fetch remote feed"}), 500
+        
     return jsonify(releases_cache["data"])
 
 if __name__ == '__main__':
