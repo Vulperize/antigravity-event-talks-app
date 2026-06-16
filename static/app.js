@@ -113,7 +113,7 @@ function selectRelease(id) {
         card.classList.remove('active');
     });
     
-    const selectedCard = document.querySelector(`.release-card[data-id="${escapeHtml(id)}"]`);
+    const selectedCard = document.querySelector(`.release-card[data-id="${CSS.escape(id)}"]`);
     if (selectedCard) {
         selectedCard.classList.add('active');
     }
@@ -133,7 +133,7 @@ function selectRelease(id) {
                 </div>
                 <h2 class="detail-title">${escapeHtml(item.title)}</h2>
             </div>
-            <button class="tweet-btn" onclick="shareTweet('${escapeHtml(item.id)}')">
+            <button class="tweet-btn" data-id="${escapeHtml(item.id)}">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
                 <span>Tweet</span>
             </button>
@@ -149,7 +149,9 @@ function shareTweet(id) {
     if (!item) return;
     
     // Build tweet text
-    const textSnippet = item.strippedContent.substring(0, 150) + "...";
+    const textSnippet = item.strippedContent.length > 150 ? 
+        item.strippedContent.substring(0, 150) + "..." : 
+        item.strippedContent;
     const tweetText = `BigQuery Update: ${item.title}\n\n"${textSnippet}"\n\n#GoogleCloud #BigQuery`;
     
     // Generate Twitter Web Intent URL
@@ -160,6 +162,14 @@ function shareTweet(id) {
 }
 
 // Event Bindings
+detailPane.addEventListener('click', (e) => {
+    const btn = e.target.closest('.tweet-btn');
+    if (btn) {
+        const id = btn.getAttribute('data-id');
+        shareTweet(id);
+    }
+});
+
 feedList.addEventListener('click', (e) => {
     const card = e.target.closest('.release-card');
     if (card) {
