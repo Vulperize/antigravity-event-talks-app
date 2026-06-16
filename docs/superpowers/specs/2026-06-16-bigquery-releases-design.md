@@ -37,10 +37,15 @@ Each parsed update item will contain:
 ## Key Features & UI/UX Design
 - **Theme**: Dark mode by default with a Toggle Switch in the header that overrides CSS variables to swap dynamically to a clean Light Mode. Elegant glassmorphism effects and soft color palettes are used in both modes.
 - **Master-Detail Layout**:
-  - **Left Column**: List of release updates sorted chronologically, with keyword search, category filters (All, Features, Changes, Deprecations), and a "Copy to Clipboard" utility button on each release card.
+  - **Left Column**: List of release updates sorted chronologically, with keyword search, category filters, a "Copy to Clipboard" utility button, relative publication dates (e.g. "Today", "2 days ago"), and unread status dots.
   - **Right Column**: Detailed view displaying the selected update's full text, publication date, and a prominent "Tweet this update" button.
 - **Refresh State**: A spin animation on the refresh icon while fetching the newest feed data from the backend.
 - **Export Utility**: An "Export to CSV" button that lets users download the currently active (searched/filtered) list of release notes as a CSV file.
+- **UX Enhancements**:
+  - **Toast Notifications**: Display non-intrusive notification popups on successful/failed updates or clipboard actions.
+  - **Unread dots**: Track read status of updates using browser `localStorage` and display a small, elegant dot next to unread items.
+  - **Relative dates**: Automatically translate publication dates into relative timestamps (e.g., "Today", "Yesterday").
+  - **Keyboard navigation**: Support keyboard shortcuts (Up/Down arrow keys to navigate lists, Enter key to select/open notes).
 - **Micro-interactions**: Hover effects, smooth transitions on selected items, fade-in animations on load.
 
 ## Security & Reliability

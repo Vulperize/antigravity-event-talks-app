@@ -1096,3 +1096,164 @@ document.getElementById('export-csv-btn').addEventListener('click', () => {
 git commit -am "feat: implement clipboard copy, CSV export, and light mode theme toggle switch"
 ```
 
+---
+
+### Task 9: UX Enhancements (Toasts, Keyboard Navigation, Read/Unread Dots, Relative Dates)
+
+**Files:**
+- Modify: `templates/index.html`
+- Modify: `static/styles.css`
+- Modify: `static/app.js`
+
+**Step 1: Update HTML for toast containers**
+Add a toast container div to `templates/index.html` (at the bottom of the body):
+```html
+<div id="toast-container" class="toast-container"></div>
+```
+
+**Step 2: Update CSS for toast notices, unread indicators, and active keyboard focus**
+In `static/styles.css`, add styles for:
+- Toast notifications container and alert cards.
+- Unread status indicator dots on the card layout.
+- Focused keyboard styles for release cards (active navigation indicator).
+```css
+/* Toast Notifications */
+.toast-container {
+    position: fixed;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    z-index: 1000;
+}
+.toast {
+    background: rgba(15, 23, 42, 0.9);
+    border: 1px solid var(--accent-blue);
+    color: var(--text-primary);
+    padding: 0.75rem 1.25rem;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    animation: slideIn 0.3s ease, fadeOut 0.3s ease 2.7s forwards;
+}
+@keyframes slideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+@keyframes fadeOut {
+    to { opacity: 0; transform: translateY(10px); }
+}
+
+/* Unread Indicator Dot */
+.unread-dot {
+    width: 6px;
+    height: 6px;
+    background-color: var(--bugfix-color);
+    border-radius: 50%;
+    display: inline-block;
+}
+
+/* Keyboard Navigation focus style */
+.release-card:focus-visible {
+    outline: 2px solid var(--accent-blue);
+    outline-offset: -2px;
+}
+```
+
+**Step 3: Update JS to implement Relative Dates, LocalStorage Read tracking, Keyboard listeners, and Toast helper**
+In `static/app.js`:
+- Create a toast notification helper:
+```javascript
+function showToast(message) {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.textContent = message;
+    container.appendChild(toast);
+    setTimeout(() => { toast.remove(); }, 3000);
+}
+```
+- Implement local storage tracking for read/unread updates:
+```javascript
+function getReadReleases() {
+    return JSON.parse(localStorage.getItem('read_releases') || '[]');
+}
+function markReleaseAsRead(id) {
+    let read = getReadReleases();
+    if (!read.includes(id)) {
+        read.push(id);
+        localStorage.setItem('read_releases', JSON.stringify(read));
+    }
+}
+```
+- Integrate unread dots in `renderList()` card template:
+```javascript
+const isRead = getReadReleases().includes(item.id);
+const unreadIndicator = isRead ? '' : '<span class="unread-dot" title="Unread update"></span>';
+```
+Include `unreadIndicator` in the card header.
+- Implement relative date helper:
+```javascript
+function getRelativeDate(dateStr) {
+    if (!dateStr) return '';
+    const now = new Date();
+    const pubDate = new Date(dateStr);
+    const diffTime = Math.abs(now - pubDate);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 1) return 'Today';
+    if (diffDays === 2) return 'Yesterday';
+    if (diffDays <= 7) return `${diffDays - 1} days ago`;
+    return dateStr; // Fallback to absolute date
+}
+```
+Use `getRelativeDate(item.date)` for the date display.
+- Add Keyboard Navigation support:
+Ensure cards render with `tabindex="0"` for keyboard focus capability.
+```javascript
+// Inside renderList mapping:
+// tabindex="0" on the .release-card div
+// and onkeydown="handleCardKey(event, '${item.id}')"
+```
+Implement keyboard navigate listener:
+```javascript
+function handleCardKey(event, id) {
+    if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        selectRelease(id);
+    }
+}
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        const cards = Array.from(document.querySelectorAll('.release-card'));
+        const activeCard = document.activeElement;
+        const index = cards.indexOf(activeCard);
+        
+        if (index > -1) {
+            e.preventDefault();
+            let nextIndex = e.key === 'ArrowDown' ? index + 1 : index - 1;
+            if (nextIndex >= 0 && nextIndex < cards.length) {
+                cards[nextIndex].focus();
+            }
+        } else if (cards.length > 0) {
+            cards[0].focus();
+        }
+    }
+});
+```
+- Call `markReleaseAsRead(id)` inside `selectRelease(id)` to update indicators, and trigger `showToast("Loaded newest release notes!")` inside `fetchReleases`.
+
+**Step 4: Verify UX features**
+1. Open dashboard. Verify relative dates are rendered (e.g. Today/Yesterday).
+2. Check unread status red dots are displayed on unread items. Click an item, verify the red dot disappears.
+3. Refresh the page to verify read/unread status is persisted in `localStorage`.
+4. Press Tab to focus a card, use Up and Down arrow keys to scroll, press Enter to open an update details.
+5. Click "Refresh" and verify a toast notification is displayed.
+
+**Step 5: Commit**
+```bash
+git commit -am "feat: implement relative date labels, localstorage read tracking, keyboard navigation, and toast notifications"
+```
+
