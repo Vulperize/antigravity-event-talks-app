@@ -67,23 +67,36 @@ function renderList() {
         const snippet = stripHtml(item.content);
         
         return `
-            <div class="release-card ${isSelected ? 'active' : ''}" onclick="selectRelease('${item.id}')">
+            <div class="release-card ${isSelected ? 'active' : ''}" data-id="${escapeHtml(item.id)}">
                 <div class="card-header">
-                    <span class="badge ${item.type}">${item.type}</span>
-                    <span class="card-date">${item.date}</span>
+                    <span class="badge ${escapeHtml(item.type)}">${escapeHtml(item.type)}</span>
+                    <span class="card-date">${escapeHtml(item.date)}</span>
                 </div>
-                <h3>${item.title}</h3>
-                <p class="card-snippet">${snippet}</p>
+                <h3>${escapeHtml(item.title)}</h3>
+                <p class="card-snippet">${escapeHtml(snippet)}</p>
             </div>
         `;
     }).join('');
 }
 
 // Helpers
+function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/[&<>'"]/g, 
+        tag => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            "'": '&#39;',
+            '"': '&quot;'
+        }[tag] || tag)
+    );
+}
+
 function stripHtml(html) {
-    const tmp = document.createElement("DIV");
-    tmp.innerHTML = html;
-    return tmp.textContent || tmp.innerText || "";
+    if (!html) return '';
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    return doc.body.textContent || "";
 }
 
 // Stub function for selectRelease
@@ -92,6 +105,14 @@ function selectRelease(id) {
 }
 
 // Event Bindings
+feedList.addEventListener('click', (e) => {
+    const card = e.target.closest('.release-card');
+    if (card) {
+        const id = card.getAttribute('data-id');
+        selectRelease(id);
+    }
+});
+
 searchInput.addEventListener('input', (e) => {
     searchQuery = e.target.value;
     renderList();
