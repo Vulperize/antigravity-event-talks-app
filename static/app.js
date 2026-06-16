@@ -50,18 +50,19 @@ function setLoadingState(isLoading) {
     }
 }
 
+function getFilteredReleases() {
+    return releases.filter(item => {
+        const matchesCategory = activeFilter === 'ALL' || item.type === activeFilter;
+        const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                              item.strippedContent.toLowerCase().includes(searchQuery.toLowerCase());
+        return matchesCategory && matchesSearch;
+    });
+}
+
 // Render Sidebar Cards
 function renderList() {
     // Filter and Search items
-    const filtered = releases.filter(item => {
-        const matchesCategory = activeFilter === 'ALL' || item.type === activeFilter;
-        
-        const cleanContent = item.strippedContent.toLowerCase();
-        const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                              cleanContent.includes(searchQuery.toLowerCase());
-                              
-        return matchesCategory && matchesSearch;
-    });
+    const filtered = getFilteredReleases();
 
     if (filtered.length === 0) {
         feedList.innerHTML = '<div class="empty-state"><p>No release notes match your criteria.</p></div>';
@@ -244,12 +245,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (exportBtn) {
         exportBtn.addEventListener('click', () => {
             // Generate CSV from currently active (filtered/searched) release notes
-            const filtered = releases.filter(item => {
-                const matchesCategory = activeFilter === 'ALL' || item.type === activeFilter;
-                return matchesCategory && (item.title.toLowerCase().includes(searchQuery.toLowerCase()) || item.strippedContent.toLowerCase().includes(searchQuery.toLowerCase()));
-            });
+            const filtered = getFilteredReleases();
             
-            let csvContent = "data:text/csv;charset=utf-8,ID,Date,Category,Title,Content\n";
+            let csvContent = "ID,Date,Category,Title,Content\n";
             filtered.forEach(item => {
                 const row = [
                     item.id,
@@ -261,13 +259,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 csvContent += row + "\n";
             });
             
-            const encodedUri = encodeURI(csvContent);
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
             const link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
-            link.setAttribute("download", `bigquery_releases_${activeFilter.toLowerCase()}.csv`);
+            link.href = url;
+            link.download = `bigquery_releases_${activeFilter.toLowerCase()}.csv`;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
+            URL.revokeObjectURL(url);
         });
     }
 });

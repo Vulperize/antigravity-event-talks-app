@@ -419,6 +419,23 @@ body.light-mode {
     --bg-controls: rgba(248, 250, 252, 0.7);
     --bg-sidebar: rgba(248, 250, 252, 0.5);
     --bg-detail: rgba(15, 23, 42, 0.03);
+    --feature-color: #0284c7;
+    --change-color: #047857;
+    --deprecation-color: #b45309;
+    --bugfix-color: #b91c1c;
+}
+
+body.light-mode #search-input {
+    background: rgba(255, 255, 255, 0.8);
+    border-color: rgba(0, 0, 0, 0.1);
+}
+body.light-mode .filter-badge {
+    background: rgba(255, 255, 255, 0.8);
+    border-color: rgba(0, 0, 0, 0.1);
+}
+body.light-mode .filter-badge.active {
+    background: var(--accent-blue);
+    color: white;
 }
 
 body.light-mode .btn-secondary {
@@ -446,7 +463,21 @@ body.light-mode .btn-secondary:hover {
     position: relative;
     width: 38px;
 }
-.theme-switch input { display:none; }
+.theme-switch input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+.theme-switch input:focus-visible + .slider {
+    outline: 2px solid var(--accent-blue);
+    outline-offset: 2px;
+}
 .slider {
     background-color: #ccc;
     bottom: 0;
