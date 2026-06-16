@@ -1,15 +1,19 @@
 import hashlib
-import logging
+import time
 import xml.etree.ElementTree as ET
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, request
 import requests
 
 app = Flask(__name__)
 
 FEED_URL = "https://docs.cloud.google.com/feeds/bigquery-release-notes.xml"
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# In-memory cache store
+releases_cache = {
+    "data": None,
+    "last_updated": 0
+}
+CACHE_TIMEOUT_SECONDS = 3600  # 1 hour
 
 def parse_xml_feed(xml_content):
     root = ET.fromstring(xml_content)
@@ -57,16 +61,26 @@ def index():
 
 @app.route('/api/releases')
 def get_releases():
-    try:
-        response = requests.get(FEED_URL, timeout=10)
-        if response.status_code == 200:
-            data = parse_xml_feed(response.content)
-            return jsonify(data)
-        logging.error("Failed to fetch feed: HTTP %d", response.status_code)
-        return jsonify({"error": "An unexpected error occurred while fetching release notes"}), 500
-    except Exception as e:
-        logging.error("Failed to fetch/parse feed: %s", e)
-        return jsonify({"error": "An unexpected error occurred while fetching release notes"}), 500
+    force_refresh = request.args.get('refresh', 'false').lower() == 'true'
+    now = time.time()
+    
+    if force_refresh or not releases_cache["data"] or (now - releases_cache["last_updated"] > CACHE_TIMEOUT_SECONDS):
+        try:
+            response = requests.get(FEED_URL, timeout=10)
+            if response.status_code == 200:
+                parsed_data = parse_xml_feed(response.content)
+                releases_cache["data"] = parsed_data
+                releases_cache["last_updated"] = now
+            else:
+                app.logger.error("Failed to fetch feed: HTTP %d", response.status_code)
+                if not releases_cache["data"]:
+                    return jsonify({"error": "Failed to fetch remote feed"}), 500
+        except Exception as e:
+            if not releases_cache["data"]:
+                app.logger.error("Failed to fetch/parse feed: %s", e)
+                return jsonify({"error": "An unexpected error occurred while fetching release notes"}), 500
+                
+    return jsonify(releases_cache["data"])
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
