@@ -11,6 +11,10 @@
     --change-color: #10b981;
     --deprecation-color: #f59e0b;
     --bugfix-color: #ef4444;
+    --bg-header: rgba(15, 23, 42, 0.9);
+    --bg-controls: rgba(15, 23, 42, 0.7);
+    --bg-sidebar: rgba(15, 23, 42, 0.5);
+    --bg-detail: rgba(30, 41, 59, 0.15);
 }
 
 * {
@@ -35,7 +39,7 @@ body {
 
 /* Header */
 .app-header {
-    background: rgba(15, 23, 42, 0.9);
+    background: var(--bg-header);
     backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--border-color);
     padding: 1rem 2rem;
@@ -97,7 +101,7 @@ body {
 
 /* Controls */
 .controls-section {
-    background: rgba(15, 23, 42, 0.7);
+    background: var(--bg-controls);
     border-bottom: 1px solid var(--border-color);
     padding: 1rem 2rem;
     display: flex;
@@ -179,7 +183,7 @@ body {
     width: 380px;
     border-right: 1px solid var(--border-color);
     overflow-y: auto;
-    background: rgba(15, 23, 42, 0.5);
+    background: var(--bg-sidebar);
 }
 
 .feed-list {
@@ -193,7 +197,7 @@ body {
     flex: 1;
     overflow-y: auto;
     padding: 2rem;
-    background: rgba(30, 41, 59, 0.15);
+    background: var(--bg-detail);
 }
 
 /* Cards */
@@ -224,6 +228,12 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
+}
+
+.card-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
 .badge {
@@ -315,7 +325,7 @@ body {
 .detail-content {
     font-size: 1rem;
     line-height: 1.7;
-    color: #e2e8f0;
+    color: var(--text-primary);
 }
 
 .detail-content p {
@@ -332,7 +342,8 @@ body {
 }
 
 .detail-content code {
-    background: rgba(30, 41, 59, 0.8);
+    background: var(--bg-card-hover);
+    color: var(--accent-hover);
     padding: 0.2rem 0.4rem;
     border-radius: 4px;
     font-family: monospace;
@@ -392,4 +403,109 @@ body {
         border-right: none;
         border-bottom: 1px solid var(--border-color);
     }
+}
+
+/* Light Mode Overrides */
+body.light-mode {
+    --bg-dark: #f8fafc;
+    --bg-card: #ffffff;
+    --bg-card-hover: #f1f5f9;
+    --border-color: rgba(0, 0, 0, 0.08);
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --accent-blue: #0284c7;
+    --accent-hover: #0369a1;
+    --bg-header: rgba(248, 250, 252, 0.9);
+    --bg-controls: rgba(248, 250, 252, 0.7);
+    --bg-sidebar: rgba(248, 250, 252, 0.5);
+    --bg-detail: rgba(15, 23, 42, 0.03);
+}
+
+body.light-mode .btn-secondary {
+    background: rgba(0, 0, 0, 0.05);
+}
+body.light-mode .btn-secondary:hover {
+    background: rgba(0, 0, 0, 0.1);
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+/* Style for Theme Toggle switch */
+.theme-switch-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.theme-switch {
+    display: inline-block;
+    height: 20px;
+    position: relative;
+    width: 38px;
+}
+.theme-switch input { display:none; }
+.slider {
+    background-color: #ccc;
+    bottom: 0;
+    cursor: pointer;
+    left: 0;
+    position: absolute;
+    right: 0;
+    top: 0;
+    transition: .4s;
+    border-radius: 34px;
+}
+.slider:before {
+    background-color: white;
+    bottom: 3px;
+    content: "";
+    height: 14px;
+    left: 4px;
+    position: absolute;
+    transition: .4s;
+    width: 14px;
+    border-radius: 50%;
+}
+input:checked + .slider { background-color: #38bdf8; }
+input:checked + .slider:before { transform: translateX(16px); }
+
+.theme-label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+/* Copy Button styles on cards */
+.copy-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0.2rem;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    align-self: flex-start;
+}
+.copy-btn:hover {
+    color: var(--accent-blue);
+    background: rgba(56, 189, 248, 0.1);
+}
+
+/* Secondary Button styling */
+.btn-secondary {
+    background: rgba(30, 41, 59, 0.5);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    font-weight: 500;
+    font-family: inherit;
+    padding: 0.5rem 1.25rem;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.btn-secondary:hover {
+    background: rgba(30, 41, 59, 0.8);
+    border-color: var(--text-secondary);
 }

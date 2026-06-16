@@ -76,7 +76,10 @@ function renderList() {
             <div class="release-card ${isSelected ? 'active' : ''}" data-id="${escapeHtml(item.id)}">
                 <div class="card-header">
                     <span class="badge ${escapeHtml(item.type)}">${escapeHtml(item.type)}</span>
-                    <span class="card-date">${escapeHtml(item.date)}</span>
+                    <div class="card-meta">
+                        <button class="copy-btn" title="Copy to clipboard">📋</button>
+                        <span class="card-date">${escapeHtml(item.date)}</span>
+                    </div>
                 </div>
                 <h3>${escapeHtml(item.title)}</h3>
                 <p class="card-snippet">${escapeHtml(snippet)}</p>
@@ -170,7 +173,32 @@ detailPane.addEventListener('click', (e) => {
     }
 });
 
+async function copyToClipboard(btn, text) {
+    try {
+        await navigator.clipboard.writeText(text);
+        const originalHTML = btn.innerHTML;
+        btn.innerHTML = '✓';
+        setTimeout(() => { btn.innerHTML = originalHTML; }, 1500);
+    } catch (err) {
+        console.error('Failed to copy text: ', err);
+    }
+}
+
 feedList.addEventListener('click', (e) => {
+    const copyBtn = e.target.closest('.copy-btn');
+    if (copyBtn) {
+        e.stopPropagation(); // Stop click from selecting card
+        const card = copyBtn.closest('.release-card');
+        const id = card.getAttribute('data-id');
+        const item = releases.find(r => r.id === id);
+        if (item) {
+            // Copy title and plain text snippet
+            const snippet = item.strippedContent;
+            copyToClipboard(copyBtn, `${item.title}: ${snippet}`);
+        }
+        return;
+    }
+    
     const card = e.target.closest('.release-card');
     if (card) {
         const id = card.getAttribute('data-id');
@@ -198,4 +226,48 @@ filtersContainer.addEventListener('click', (e) => {
 document.addEventListener('DOMContentLoaded', () => {
     fetchReleases();
     refreshBtn.addEventListener('click', () => fetchReleases(true));
+
+    // Theme Switch
+    const toggleSwitch = document.querySelector('.theme-switch input[type="checkbox"]');
+    if (toggleSwitch) {
+        toggleSwitch.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                document.body.classList.add('light-mode');
+            } else {
+                document.body.classList.remove('light-mode');
+            }
+        });
+    }
+
+    // CSV Export
+    const exportBtn = document.getElementById('export-csv-btn');
+    if (exportBtn) {
+        exportBtn.addEventListener('click', () => {
+            // Generate CSV from currently active (filtered/searched) release notes
+            const filtered = releases.filter(item => {
+                const matchesCategory = activeFilter === 'ALL' || item.type === activeFilter;
+                return matchesCategory && (item.title.toLowerCase().includes(searchQuery.toLowerCase()) || item.strippedContent.toLowerCase().includes(searchQuery.toLowerCase()));
+            });
+            
+            let csvContent = "data:text/csv;charset=utf-8,ID,Date,Category,Title,Content\n";
+            filtered.forEach(item => {
+                const row = [
+                    item.id,
+                    item.date,
+                    item.type,
+                    `"${item.title.replace(/"/g, '""')}"`,
+                    `"${item.strippedContent.replace(/"/g, '""').replace(/\n/g, ' ')}"`
+                ].join(",");
+                csvContent += row + "\n";
+            });
+            
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `bigquery_releases_${activeFilter.toLowerCase()}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+    }
 });
