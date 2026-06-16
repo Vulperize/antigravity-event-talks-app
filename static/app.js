@@ -55,4 +55,5 @@ function selectRelease(id) {
 // Init
 document.addEventListener('DOMContentLoaded', () => {
     fetchReleases();
+    refreshBtn.addEventListener('click', () => fetchReleases(true));
 });
