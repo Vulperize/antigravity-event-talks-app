@@ -927,3 +927,172 @@ function shareTweet(id) {
 ```bash
 git commit -am "feat: implement detail viewer pane and twitter intent link generation"
 ```
+
+---
+
+### Task 8: Clipboard Copy, CSV Export, and Theme Toggle Utilities
+
+**Files:**
+- Modify: `templates/index.html`
+- Modify: `static/styles.css`
+- Modify: `static/app.js`
+
+**Step 1: Update HTML for Theme Toggle, Export Button, and card structure**
+In `templates/index.html`, add:
+- A theme toggle switch in the header:
+```html
+<div class="theme-switch-wrapper">
+    <label class="theme-switch" for="checkbox">
+        <input type="checkbox" id="checkbox" />
+        <div class="slider round"></div>
+    </label>
+    <span class="theme-label">Light Mode</span>
+</div>
+```
+- An "Export CSV" button in the controls section:
+```html
+<button id="export-csv-btn" class="btn-secondary">Export to CSV</button>
+```
+
+**Step 2: Update CSS styling for Light Mode and Utilities**
+In `static/styles.css`, define light mode variable overrides under body.light-mode:
+```css
+body.light-mode {
+    --bg-dark: #f8fafc;
+    --bg-card: #ffffff;
+    --bg-card-hover: #f1f5f9;
+    --border-color: rgba(0, 0, 0, 0.08);
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --accent-blue: #0284c7;
+    --accent-hover: #0369a1;
+}
+/* Style for Theme Toggle switch */
+.theme-switch-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.theme-switch {
+    display: inline-block;
+    height: 20px;
+    position: relative;
+    width: 38px;
+}
+.theme-switch input { display:none; }
+.slider {
+    background-color: #ccc;
+    bottom: 0;
+    cursor: pointer;
+    left: 0;
+    position: absolute;
+    right: 0;
+    top: 0;
+    transition: .4s;
+    border-radius: 34px;
+}
+.slider:before {
+    background-color: white;
+    bottom: 3px;
+    content: "";
+    height: 14px;
+    left: 4px;
+    position: absolute;
+    transition: .4s;
+    width: 14px;
+    border-radius: 50%;
+}
+input:checked + .slider { background-color: #38bdf8; }
+input:checked + .slider:before { transform: translateX(16px); }
+
+/* Copy Button styles on cards */
+.copy-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0.2rem;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    align-self: flex-start;
+}
+.copy-btn:hover {
+    color: var(--accent-blue);
+    background: rgba(56, 189, 248, 0.1);
+}
+```
+
+**Step 3: Update JS for Theme Toggle, Clipboard Copy, and CSV Export**
+In `static/app.js`:
+- Add theme toggle listener:
+```javascript
+const toggleSwitch = document.querySelector('.theme-switch input[type="checkbox"]');
+toggleSwitch.addEventListener('change', (e) => {
+    if (e.target.checked) {
+        document.body.classList.add('light-mode');
+    } else {
+        document.body.classList.remove('light-mode');
+    }
+});
+```
+- Add a click handler to copy card snippet/text:
+```javascript
+async function copyToClipboard(event, text) {
+    event.stopPropagation(); // Avoid selecting the card
+    try {
+        await navigator.clipboard.writeText(text);
+        const btn = event.currentTarget;
+        const originalHTML = btn.innerHTML;
+        btn.innerHTML = '✓';
+        setTimeout(() => { btn.innerHTML = originalHTML; }, 1500);
+    } catch (err) {
+        console.error('Failed to copy text: ', err);
+    }
+}
+```
+- In `renderList()`, render a copy button inside each card header:
+```javascript
+<button class="copy-btn" onclick="copyToClipboard(event, '${item.title}: ${snippet.replace(/'/g, "\\'")}')" title="Copy to clipboard">📋</button>
+```
+- Add CSV Export handler:
+```javascript
+document.getElementById('export-csv-btn').addEventListener('click', () => {
+    // Generate CSV from currently active (filtered/searched) release notes
+    const filtered = releases.filter(item => {
+        const matchesCategory = activeFilter === 'ALL' || item.type === activeFilter;
+        const cleanContent = stripHtml(item.content).toLowerCase();
+        return matchesCategory && (item.title.toLowerCase().includes(searchQuery.toLowerCase()) || cleanContent.includes(searchQuery.toLowerCase()));
+    });
+    
+    let csvContent = "data:text/csv;charset=utf-8,ID,Date,Category,Title,Content\n";
+    filtered.forEach(item => {
+        const row = [
+            item.id,
+            item.date,
+            item.type,
+            `"${item.title.replace(/"/g, '""')}"`,
+            `"${stripHtml(item.content).replace(/"/g, '""').replace(/\n/g, ' ')}"`
+        ].join(",");
+        csvContent += row + "\n";
+    });
+    
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `bigquery_releases_${activeFilter.toLowerCase()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+});
+```
+
+**Step 4: Verify utilities**
+1. Load dashboard. Click the Theme toggle switch in header, check if it changes seamlessly from dark mode to light mode.
+2. Click the clipboard copy icon on a card, verify it shows "✓" and that the card content is copied to clipboard.
+3. Click "Export to CSV" button in header, verify `bigquery_releases_all.csv` downloads with expected formatted records.
+
+**Step 5: Commit**
+```bash
+git commit -am "feat: implement clipboard copy, CSV export, and light mode theme toggle switch"
+```
+

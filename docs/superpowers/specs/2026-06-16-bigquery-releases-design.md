@@ -35,11 +35,12 @@ Each parsed update item will contain:
 - `link`: Direct link to Google documentation
 
 ## Key Features & UI/UX Design
-- **Theme**: Dark mode by default with elegant glassmorphism effects, a curated color palette (deep slate backgrounds, vibrant blue accents, soft emerald/amber/crimson category badges).
+- **Theme**: Dark mode by default with a Toggle Switch in the header that overrides CSS variables to swap dynamically to a clean Light Mode. Elegant glassmorphism effects and soft color palettes are used in both modes.
 - **Master-Detail Layout**:
-  - **Left Column**: List of release updates sorted chronologically, with keyword search and category filters (All, Features, Changes, Deprecations).
+  - **Left Column**: List of release updates sorted chronologically, with keyword search, category filters (All, Features, Changes, Deprecations), and a "Copy to Clipboard" utility button on each release card.
   - **Right Column**: Detailed view displaying the selected update's full text, publication date, and a prominent "Tweet this update" button.
 - **Refresh State**: A spin animation on the refresh icon while fetching the newest feed data from the backend.
+- **Export Utility**: An "Export to CSV" button that lets users download the currently active (searched/filtered) list of release notes as a CSV file.
 - **Micro-interactions**: Hover effects, smooth transitions on selected items, fade-in animations on load.
 
 ## Security & Reliability
