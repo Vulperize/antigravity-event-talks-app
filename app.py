@@ -1,10 +1,15 @@
-from flask import Flask, render_template, jsonify
+import hashlib
+import logging
 import xml.etree.ElementTree as ET
+from flask import Flask, render_template, jsonify
 import requests
 
 app = Flask(__name__)
 
 FEED_URL = "https://docs.cloud.google.com/feeds/bigquery-release-notes.xml"
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
 
 def parse_xml_feed(xml_content):
     root = ET.fromstring(xml_content)
@@ -14,18 +19,18 @@ def parse_xml_feed(xml_content):
     
     for entry in root.findall('atom:entry', ns):
         title = entry.find('atom:title', ns)
-        title_text = title.text if title is not None else "No Title"
+        title_text = (title.text if title is not None else None) or "No Title"
         
         updated = entry.find('atom:updated', ns)
-        updated_text = updated.text if updated is not None else ""
+        updated_text = (updated.text if updated is not None else None) or ""
         # Format date (e.g., "2026-06-16T09:00:00Z" -> "2026-06-16")
         date_short = updated_text[:10] if updated_text else ""
         
         content = entry.find('atom:content', ns)
-        content_html = content.text if content is not None else ""
+        content_html = (content.text if content is not None else None) or ""
         
         # ID generation based on title and date
-        item_id = str(hash(title_text + date_short))
+        item_id = hashlib.sha256((title_text + date_short).encode('utf-8')).hexdigest()[:16]
         
         # Simple category deduction based on keywords
         note_type = "CHANGE"
@@ -57,9 +62,11 @@ def get_releases():
         if response.status_code == 200:
             data = parse_xml_feed(response.content)
             return jsonify(data)
-        return jsonify({"error": "Failed to fetch feed"}), 500
+        logging.error("Failed to fetch feed: HTTP %d", response.status_code)
+        return jsonify({"error": "An unexpected error occurred while fetching release notes"}), 500
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        logging.error("Failed to fetch/parse feed: %s", e)
+        return jsonify({"error": "An unexpected error occurred while fetching release notes"}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
