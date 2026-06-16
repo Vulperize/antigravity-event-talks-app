@@ -1,5 +1,6 @@
 import hashlib
 import time
+import threading
 import xml.etree.ElementTree as ET
 from flask import Flask, render_template, jsonify, request
 import requests
@@ -14,6 +15,7 @@ releases_cache = {
     "last_updated": 0
 }
 CACHE_TIMEOUT_SECONDS = 3600  # 1 hour
+cache_lock = threading.Lock()
 
 def parse_xml_feed(xml_content):
     root = ET.fromstring(xml_content)
@@ -65,20 +67,26 @@ def get_releases():
     now = time.time()
     
     if force_refresh or not releases_cache["data"] or (now - releases_cache["last_updated"] > CACHE_TIMEOUT_SECONDS):
-        try:
-            response = requests.get(FEED_URL, timeout=10)
-            if response.status_code == 200:
-                parsed_data = parse_xml_feed(response.content)
-                releases_cache["data"] = parsed_data
-                releases_cache["last_updated"] = now
-            else:
-                app.logger.error("Failed to fetch feed: HTTP %d", response.status_code)
-                if not releases_cache["data"]:
-                    return jsonify({"error": "Failed to fetch remote feed"}), 500
-        except Exception as e:
-            if not releases_cache["data"]:
-                app.logger.error("Failed to fetch/parse feed: %s", e)
-                return jsonify({"error": "An unexpected error occurred while fetching release notes"}), 500
+        with cache_lock:
+            # Recheck inside lock (double-checked locking)
+            now = time.time()
+            if force_refresh or not releases_cache["data"] or (now - releases_cache["last_updated"] > CACHE_TIMEOUT_SECONDS):
+                try:
+                    response = requests.get(FEED_URL, timeout=10)
+                    if response.status_code == 200:
+                        parsed_data = parse_xml_feed(response.content)
+                        releases_cache["data"] = parsed_data
+                        releases_cache["last_updated"] = now
+                    else:
+                        app.logger.error("Failed to fetch feed: HTTP %d", response.status_code)
+                        if not releases_cache["data"]:
+                            return jsonify({"error": "Failed to fetch remote feed"}), 500
+                except Exception as e:
+                    if not releases_cache["data"]:
+                        app.logger.error("Failed to fetch/parse feed: %s", e)
+                        return jsonify({"error": "An unexpected error occurred while fetching release notes"}), 500
+                    else:
+                        app.logger.warning("Failed to fetch/parse feed, serving stale cached data: %s", e)
                 
     return jsonify(releases_cache["data"])
 
